@@ -1,4 +1,4 @@
-# TerraDock: A Modernized OpenStreetMap Tile Server
+# Terradock: A Modernized OpenStreetMap Tile Server
 
 A containerized OpenStreetMap tile server environment built on Ubuntu 24.04 and PostgreSQL 16. This project modernizes the original OSM tile server implementation with updated components and optimized configurations.
 
