@@ -1,6 +1,6 @@
 FROM ubuntu:24.04 AS compiler-common
 
-LABEL org.opencontainers.image.source https://github.com/Sriram-PR/Terradock
+LABEL org.opencontainers.image.source=https://github.com/Sriram-PR/Terradock
 
 ENV DEBIAN_FRONTEND="noninteractive"
 ENV LANG="C.UTF-8"
