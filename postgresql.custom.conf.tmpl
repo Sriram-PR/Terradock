@@ -1,22 +1,19 @@
-# Suggested minimal settings for tile server
-# Adjusted for PostgreSQL 16
-
 # Memory Configuration
-shared_buffers = 128MB
-work_mem = 128MB
-maintenance_work_mem = 256MB
-temp_buffers = 32MB
-wal_buffers = 1024kB
-effective_cache_size = 512MB
+shared_buffers = 2GB
+work_mem = 256MB
+maintenance_work_mem = 512MB
+temp_buffers = 64MB
+wal_buffers = 16MB
+effective_cache_size = 4GB
 
 # Checkpointing
-min_wal_size = 1GB
-max_wal_size = 2880MB
+min_wal_size = 2GB
+max_wal_size = 4GB
 wal_writer_delay = 500ms
 commit_delay = 10000
 
 # Connection Settings
-max_connections = 250
+max_connections = 200
 listen_addresses = '*'
 
 # Query Planner
@@ -29,6 +26,6 @@ autovacuum_vacuum_scale_factor = 0.05
 autovacuum_analyze_scale_factor = 0.02
 
 # Parallel Query Settings
-max_parallel_workers_per_gather = 2
+max_parallel_workers_per_gather = 4
 max_parallel_maintenance_workers = 2
-max_parallel_workers = 4
+max_parallel_workers = 8
