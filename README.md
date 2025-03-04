@@ -1,4 +1,4 @@
-# TerraDock: A Modernized OpenStreetMap Tile Server
+# Terradock: A Modernized OpenStreetMap Tile Server
 
 A containerized OpenStreetMap tile server environment built on Ubuntu 24.04 and PostgreSQL 16. This project modernizes the original OSM tile server implementation with updated components and optimized configurations.
 
@@ -381,6 +381,33 @@ For systems without internet access:
    docker run --rm -v osm-tiles:/data -v $(pwd):/backup alpine tar -xzf /backup/osm-tiles.tar.gz -C /
    ```
 
+## Apache Configuration
+
+The tile server uses Apache with mod_tile to serve map tiles. The configuration file (`apache.conf`) contains:
+
+```apache
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    AddTileConfig /tile/ default
+    LoadTileConfigFile /etc/renderd.conf
+    ModTileRenderdSocketName /run/renderd/renderd.sock
+    ModTileRequestTimeout 0
+    ModTileMissingRequestTimeout 30
+    DocumentRoot /var/www/html
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+    <IfDefine ALLOW_CORS>
+        Header set Access-Control-Allow-Origin "*"
+    </IfDefine>
+</VirtualHost>
+```
+
+Key settings:
+- **AddTileConfig**: Maps the `/tile/` URL path to the "default" renderd configuration
+- **ModTileRenderdSocketName**: Specifies the socket used to communicate with the renderd daemon
+- **ModTileRequestTimeout**: Set to 0 (no timeout) for rendering requests
+- **ModTileMissingRequestTimeout**: 30-second timeout for missing tiles
+
 ## Cross-Origin Resource Sharing (CORS)
 
 To enable CORS for serving tiles to other domains:
@@ -393,6 +420,8 @@ docker run \
     -d terradock \
     run
 ```
+
+This activates the `<IfDefine ALLOW_CORS>` section in the Apache configuration, adding the necessary CORS headers.
 
 ## Differences from Original Project
 
@@ -412,6 +441,7 @@ The project comprises several key files:
 - **postgresql.custom.conf.tmpl**: Database configuration template
 - **openstreetmap-tiles-update-expire.sh**: Update and tile expiry script
 - **run.sh**: Main entry script controlling import and run modes
+- **apache.conf**: Apache web server configuration for tile serving
 - **leaflet-demo.html**: Web interface for viewing tiles
 
 ## Contributing
