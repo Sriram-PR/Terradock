@@ -33,6 +33,43 @@ Terradock provides a complete solution for running your own OpenStreetMap tile s
 
 ## Quick Start
 
+### Option 1: Using Pre-built Image from GitHub Container Registry
+
+1. Pull the image from GitHub Container Registry:
+   ```bash
+   docker pull ghcr.io/sriram-pr/terradock:latest
+   ```
+
+2. Create Docker volumes for persistent data:
+   ```bash
+   docker volume create osm-data
+   docker volume create osm-tiles
+   ```
+
+3. Import OpenStreetMap data (Luxembourg example):
+   ```bash
+   docker run \
+       -e DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf" \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       ghcr.io/sriram-pr/terradock:latest \
+       import
+   ```
+
+4. Run the tile server:
+   ```bash
+   docker run \
+       -p 8080:80 \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       -d ghcr.io/sriram-pr/terradock:latest \
+       run
+   ```
+
+5. Access the web interface at `http://localhost:8080`
+
+### Option 2: Building from Source
+
 1. Clone this repository:
    ```bash
    git clone https://github.com/Sriram-PR/terradock-osm-tile-server.git
