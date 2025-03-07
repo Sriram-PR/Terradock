@@ -50,6 +50,8 @@ Terradock provides a complete solution for running your own OpenStreetMap tile s
    ```bash
    docker run \
        -e DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf" \
+       -e DOWNLOAD_POLY="https://download.geofabrik.de/europe/luxembourg.poly" \
+       -e UPDATES=enabled \
        -v osm-data:/data/database/ \
        -v osm-tiles:/data/tiles/ \
        ghcr.io/sriram-pr/terradock:latest \
@@ -60,6 +62,7 @@ Terradock provides a complete solution for running your own OpenStreetMap tile s
    ```bash
    docker run \
        -p 8080:80 \
+       -e UPDATES=enabled \
        -v osm-data:/data/database/ \
        -v osm-tiles:/data/tiles/ \
        -d ghcr.io/sriram-pr/terradock:latest \
@@ -91,6 +94,8 @@ Terradock provides a complete solution for running your own OpenStreetMap tile s
    ```bash
    docker run \
        -e DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf" \
+       -e DOWNLOAD_POLY="https://download.geofabrik.de/europe/luxembourg.poly" \
+       -e UPDATES=enabled \
        -v osm-data:/data/database/ \
        -v osm-tiles:/data/tiles/ \
        terradock \
@@ -101,6 +106,7 @@ Terradock provides a complete solution for running your own OpenStreetMap tile s
    ```bash
    docker run \
        -p 8080:80 \
+       -e UPDATES=enabled \
        -v osm-data:/data/database/ \
        -v osm-tiles:/data/tiles/ \
        -d terradock \
@@ -122,7 +128,7 @@ docker run \
     import
 ```
 
-For regional updates, also include the corresponding polygon file:
+For regional updates, include the corresponding polygon file (highly recommended):
 
 ```bash
 docker run \
@@ -135,31 +141,37 @@ docker run \
     import
 ```
 
+> **Important**: The polygon file is crucial for efficient updates, as it filters OSM changes to just your region of interest. Without it, your server will process all global changes, which can be extremely resource-intensive.
+
 ## Configuration Options
 
 ### Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `THREADS` | Number of threads for importing/rendering | 4 |
-| `UPDATES` | Enable automatic updates | disabled |
-| `ALLOW_CORS` | Enable CORS headers | disabled |
-| `FLAT_NODES` | Use flat nodes file for large imports | disabled |
-| `PGPASSWORD` | PostgreSQL password for renderd user | renderd |
-| `NAME_LUA` | Custom Lua script name | openstreetmap-carto.lua |
-| `NAME_STYLE` | Custom style file name | openstreetmap-carto.style |
-| `NAME_MML` | Custom CartoCSS project file | project.mml |
-| `NAME_SQL` | Custom SQL indexes file | indexes.sql |
-| `DOWNLOAD_PBF` | URL to download OSM PBF data | NULL |
-| `DOWNLOAD_POLY` | URL to download region polygon | NULL |
-| `AUTOVACUUM` | Control PostgreSQL autovacuum | on |
-| `OSM2PGSQL_EXTRA_ARGS` | Additional args for osm2pgsql | "" |
-| `REPLICATION_URL` | URL for updates | https://planet.openstreetmap.org/replication/hour/ |
-| `MAX_INTERVAL_SECONDS` | Max time between updates | 3600 |
-| `EXPIRY_MINZOOM` | Minimum zoom for tile expiry | 13 |
-| `EXPIRY_TOUCHFROM` | Minimum zoom to mark tiles dirty | 13 |
-| `EXPIRY_DELETEFROM` | Minimum zoom to delete tiles | 19 |
-| `EXPIRY_MAXZOOM` | Maximum zoom for tile expiry | 20 |
+| Variable | Phase | Description | Default |
+|----------|-------|-------------|---------|
+| `THREADS` | Both | Number of threads for importing/rendering | 4 |
+| `UPDATES` | Both | Enable automatic updates (must be set in both import and run) | disabled |
+| `FLAT_NODES` | Both | Use flat nodes file for large imports | disabled |
+| `PGPASSWORD` | Both | PostgreSQL password for renderd user | renderd |
+| `ALLOW_CORS` | Run | Enable CORS headers | disabled |
+| `NAME_LUA` | Import | Custom Lua script name | openstreetmap-carto.lua |
+| `NAME_STYLE` | Import | Custom style file name | openstreetmap-carto.style |
+| `NAME_MML` | Import | Custom CartoCSS project file | project.mml |
+| `NAME_SQL` | Import | Custom SQL indexes file | indexes.sql |
+| `DOWNLOAD_PBF` | Import | URL to download OSM PBF data | NULL |
+| `DOWNLOAD_POLY` | Import | URL to download region polygon | NULL |
+| `WGET_ARGS` | Import | Additional arguments for wget | NULL |
+| `PG_VERSION` | Both | PostgreSQL version | 16 |
+| `AUTOVACUUM` | Both | Control PostgreSQL autovacuum | on |
+| `OSM2PGSQL_EXTRA_ARGS` | Import | Additional args for osm2pgsql | "" |
+| `REPLICATION_URL` | Both | URL for updates | https://planet.openstreetmap.org/replication/hour/ |
+| `MAX_INTERVAL_SECONDS` | Both | Max time between updates | 3600 |
+| `EXPIRY_MINZOOM` | Run | Minimum zoom for tile expiry | 13 |
+| `EXPIRY_TOUCHFROM` | Run | Minimum zoom to mark tiles dirty | 13 |
+| `EXPIRY_DELETEFROM` | Run | Minimum zoom to delete tiles | 19 |
+| `EXPIRY_MAXZOOM` | Run | Maximum zoom for tile expiry | 20 |
+
+> **Note**: Variables marked as "Both" should be set identically during both import and run phases for proper operation.
 
 ### Resource Requirements
 
@@ -200,11 +212,66 @@ The container uses volumes mounted at specific paths:
 └── region.osm.pbf     # OSM data file to import
 ```
 
+## Key Parameter Usage Guide
+
+Understanding when and how to use key parameters is crucial for optimal operation:
+
+### THREADS
+- **Import Phase**: Controls number of parallel processes for osm2pgsql database import
+  ```bash
+  -e THREADS=8 terradock import
+  ```
+- **Run Phase**: Controls number of rendering threads for renderd tile generation
+  ```bash
+  -e THREADS=8 terradock run
+  ```
+- **Best Practice**: Set this in BOTH phases, but can use different values based on workload (higher for import, lower for rendering if needed)
+
+### FLAT_NODES
+- **Import Phase**: Enables the flat nodes file for efficient memory usage during large imports
+  ```bash
+  -e FLAT_NODES=enabled terradock import
+  ```
+- **Run Phase**: Ensures the system knows where to find the flat nodes file
+  ```bash
+  -e FLAT_NODES=enabled terradock run
+  ```
+- **Best Practice**: Set this in BOTH phases if you use it at all, and keep it consistent
+
+### OSM2PGSQL_EXTRA_ARGS
+- **Import Phase ONLY**: Provides additional arguments to osm2pgsql during import
+  ```bash
+  -e OSM2PGSQL_EXTRA_ARGS="-C 4096 --drop" terradock import
+  ```
+- **Common Uses**:
+  - `-C <cache size>`: Memory cache for import (larger = faster)
+  - `--drop`: Drop tables before import (for reimporting)
+  - `--slim`: Keep temporary tables (default in script)
+  - `--hstore-all`: Store all tags in the hstore column
+- **Best Practice**: Only needed during import, not used during run phase
+
+### Summary
+
+| Parameter | Import | Run | Notes |
+|-----------|--------|-----|-------|
+| THREADS | ✅ | ✅ | Set in both, but values can differ |
+| FLAT_NODES | ✅ | ✅ | Must be consistent if used |
+| OSM2PGSQL_EXTRA_ARGS | ✅ | ❌ | Import phase only |
+
+For large imports (country or larger), a recommended configuration would be:
+```bash
+# Import phase
+docker run -e THREADS=12 -e FLAT_NODES=enabled -e OSM2PGSQL_EXTRA_ARGS="-C 4096" terradock import
+
+# Run phase
+docker run -e THREADS=8 -e FLAT_NODES=enabled terradock run
+```
+
 ## Performance Tuning
 
 ### PostgreSQL Optimization
 
-PostgreSQL 16 configuration is optimized with settings for different hardware profiles:
+PostgreSQL 16 configuration uses hardcoded settings in the template file. Consider modifying these values based on your hardware:
 
 #### 8GB RAM System (Recommended)
 ```
@@ -224,7 +291,7 @@ effective_cache_size = 8GB
 max_parallel_workers = 16
 ```
 
-Edit the PostgreSQL template configurations for your specific hardware.
+Edit the `postgresql.custom.conf.tmpl` file and rebuild the image for your specific hardware.
 
 ### Rendering Optimization
 
@@ -261,7 +328,28 @@ When automatic updates are enabled (`UPDATES=enabled`):
    - Zoom 13-18: Marked for re-rendering
    - Zoom 19-20: Deleted (to save space)
 
-The update process runs automatically via cron. Enable updates when running the server:
+The update process runs automatically via cron. **Important**: The `UPDATES` flag must be set during both import and run phases:
+
+```bash
+# During import - sets up the initial osmosis workspace
+docker run \
+    -e UPDATES=enabled \
+    -v osm-data:/data/database/ \
+    -v osm-tiles:/data/tiles/ \
+    terradock \
+    import
+
+# During run - activates the cron job
+docker run \
+    -p 8080:80 \
+    -e UPDATES=enabled \
+    -v osm-data:/data/database/ \
+    -v osm-tiles:/data/tiles/ \
+    -d terradock \
+    run
+```
+
+To use a different update frequency:
 
 ```bash
 docker run \
@@ -360,6 +448,23 @@ docker-compose up -d
 | Slow updates | Large update files or regional filtering | Check update logs for bottlenecks |
 | "No space left on device" | Shared memory limit too low | Add `--shm-size="192m"` to docker run command |
 | Import process crashes | Memory limitations | Try enabling `FLAT_NODES=enabled` or reduce cache size |
+| Update script fails | Path mismatch in update script | Verify that the script uses the correct path to trim_osc.py |
+
+### Flat Nodes for Large Imports
+
+For importing very large regions or the entire planet, use the `FLAT_NODES` option to improve performance and reduce memory requirements:
+
+```bash
+docker run \
+    -v /path/to/planet.osm.pbf:/data/region.osm.pbf \
+    -v osm-data:/data/database/ \
+    -e "FLAT_NODES=enabled" \
+    -e "OSM2PGSQL_EXTRA_ARGS=-C 4096" \
+    terradock \
+    import
+```
+
+When using `FLAT_NODES=enabled`, ensure you set it for both import and run phases.
 
 ### Shared Memory Issues
 
@@ -383,6 +488,389 @@ Important logs are available in the container at:
 - `/var/log/tiles/osm2pgsql.log`: Database import log
 - `/var/log/tiles/expiry.log`: Tile expiry log
 - `/var/log/apache2/error.log`: Web server errors
+
+## Long-term Maintenance
+
+### Tile Cache Management
+
+The tile cache grows continuously as users request new areas and zoom levels. Without proper management, it can consume hundreds of gigabytes or even terabytes of disk space:
+
+```bash
+# Check current tile cache size
+docker exec -it [container_name] du -sh /data/tiles
+
+# Clear the entire tile cache (use with caution)
+docker exec -it [container_name] rm -rf /data/tiles/*
+```
+
+For selective cache management, consider these strategies:
+
+1. **Age-Based Pruning**: Remove tiles older than a certain date:
+   ```bash
+   docker exec -it [container_name] find /data/tiles -type f -mtime +90 -delete
+   ```
+
+2. **Zoom-Level Pruning**: Remove only high-zoom tiles that are less frequently accessed:
+   ```bash
+   docker exec -it [container_name] find /data/tiles -path "*/[17-20]/*" -type f -delete
+   ```
+
+3. **Scheduled Maintenance**: Add a cron job to periodically manage the cache:
+   ```bash
+   0 3 * * 0 docker exec [container_name] find /data/tiles -type f -mtime +60 -delete
+   ```
+
+### Database Maintenance
+
+While PostgreSQL's autovacuum handles basic maintenance, long-running OSM databases benefit from additional care:
+
+1. **Manual VACUUM**: Run a full vacuum analyze periodically:
+   ```bash
+   docker exec -it [container_name] sudo -u postgres psql -d gis -c "VACUUM ANALYZE;"
+   ```
+
+2. **Reindex**: Rebuild indexes for better performance:
+   ```bash
+   docker exec -it [container_name] sudo -u postgres psql -d gis -c "REINDEX DATABASE gis;"
+   ```
+
+3. **Scheduled Maintenance Script**:
+   ```bash
+   #!/bin/bash
+   # Run weekly database maintenance
+   docker exec [container_name] sudo -u postgres psql -d gis -c "VACUUM ANALYZE;"
+   # Monthly reindexing
+   if [ $(date +%d) -eq "01" ]; then
+     docker exec [container_name] sudo -u postgres psql -d gis -c "REINDEX DATABASE gis;"
+   fi
+   ```
+
+4. **PostgreSQL Tuning**: For long-term operation, consider adjusting these settings in `postgresql.custom.conf.tmpl`:
+   ```
+   # Increase for large databases
+   maintenance_work_mem = 1GB
+   # More aggressive autovacuum
+   autovacuum_vacuum_threshold = 1000
+   autovacuum_analyze_threshold = 500
+   ```
+
+### Monitoring
+
+Set up basic monitoring to ensure smooth operation:
+
+1. **Disk Usage**:
+   ```bash
+   # Monitor database size
+   docker exec [container_name] sudo -u postgres psql -d gis -c "SELECT pg_size_pretty(pg_database_size('gis'));"
+   
+   # Monitor tile cache growth
+   docker exec [container_name] du -sh /data/tiles
+   ```
+
+2. **Rendering Queue**:
+   ```bash
+   # Check current rendering queue
+   docker exec [container_name] sudo -u renderd renderd -t
+   ```
+
+3. **Update Lag**:
+   ```bash
+   # Check update lag (how far behind is your database)
+   docker exec [container_name] /usr/bin/osmosis-db_replag
+   ```
+
+4. **Service Status**:
+   ```bash
+   # Check if services are running
+   docker exec [container_name] service postgresql status
+   docker exec [container_name] service apache2 status
+   docker exec [container_name] ps aux | grep renderd
+   ```
+
+### Restart Procedures
+
+Proper restart procedures prevent data corruption:
+
+1. **Graceful Shutdown**:
+   ```bash
+   # Properly stop the container
+   docker stop -t 120 [container_name]
+   ```
+   The extended timeout (120 seconds) allows PostgreSQL to shut down properly.
+
+2. **After System Reboot**:
+   ```bash
+   # Start the container
+   docker start [container_name]
+   
+   # Verify services
+   docker exec [container_name] service postgresql status
+   docker exec [container_name] service apache2 status
+   docker exec [container_name] ps aux | grep renderd
+   ```
+
+3. **Recovery from Improper Shutdown**:
+   If PostgreSQL won't start after an improper shutdown:
+   ```bash
+   # Run database recovery
+   docker exec -it [container_name] sudo -u postgres pg_ctl -D /data/database/postgres/ recover
+   docker exec -it [container_name] service postgresql start
+   ```
+
+### Version Upgrade Path
+
+When upgrading to a new container version:
+
+1. **Data Backup**:
+   ```bash
+   # Create a backup of your volumes
+   docker run --rm -v osm-data:/data -v $(pwd):/backup alpine tar -czf /backup/osm-data-backup.tar.gz /data
+   docker run --rm -v osm-tiles:/data -v $(pwd):/backup alpine tar -czf /backup/osm-tiles-backup.tar.gz /data
+   ```
+
+2. **Simple Upgrade** (for minor version changes):
+   ```bash
+   # Pull the new image
+   docker pull ghcr.io/sriram-pr/terradock:latest
+   
+   # Stop and remove the old container
+   docker stop [container_name]
+   docker rm [container_name]
+   
+   # Start a new container with the same volumes
+   docker run -p 8080:80 -v osm-data:/data/database -v osm-tiles:/data/tiles -d --name [container_name] ghcr.io/sriram-pr/terradock:latest run
+   ```
+
+3. **Database Migration** (for major PostgreSQL version changes):
+   For significant version changes that require a database upgrade:
+   ```bash
+   # Export the database
+   docker exec -it [old_container] sudo -u postgres pg_dump -Fc gis > gis_backup.dump
+   
+   # Start new container in import mode
+   docker run -v $(pwd):/backup -v new-osm-data:/data/database -v new-osm-tiles:/data/tiles --name new-container ghcr.io/sriram-pr/terradock:latest import
+   
+   # Restore the database
+   docker exec -it new-container sudo -u postgres pg_restore -d gis /backup/gis_backup.dump
+   
+   # Start in run mode
+   docker stop new-container
+   docker run -p 8080:80 -v new-osm-data:/data/database -v new-osm-tiles:/data/tiles -d --name new-container ghcr.io/sriram-pr/terradock:latest run
+   ```
+
+## Customization Guide
+
+### Cron Job Customization
+
+The default cron configuration runs the update script every minute (`* * * * *`), which is excessive for most deployments. To customize:
+
+1. **Access the container**:
+   ```bash
+   docker exec -it [container_name] bash
+   ```
+
+2. **Edit the crontab**:
+   ```bash
+   nano /etc/crontab
+   ```
+
+3. **Modify the update frequency**:
+   ```
+   # Default (every minute)
+   * * * * *   renderd    openstreetmap-tiles-update-expire.sh
+   
+   # Every 15 minutes
+   */15 * * * *   renderd    openstreetmap-tiles-update-expire.sh
+   
+   # Hourly
+   0 * * * *   renderd    openstreetmap-tiles-update-expire.sh
+   
+   # Every 6 hours
+   0 */6 * * *   renderd    openstreetmap-tiles-update-expire.sh
+   
+   # Daily at 2 AM
+   0 2 * * *   renderd    openstreetmap-tiles-update-expire.sh
+   ```
+
+4. **Restart cron**:
+   ```bash
+   service cron restart
+   ```
+
+5. **For persistence**, create a custom Dockerfile:
+   ```dockerfile
+   FROM ghcr.io/sriram-pr/terradock:latest
+   COPY custom_crontab /etc/crontab
+   ```
+
+### Update Frequency Trade-offs
+
+Choose the right update frequency based on your needs:
+
+| Frequency | Configuration | CPU/IO Impact | Update Lag | Best For |
+|-----------|---------------|--------------|------------|----------|
+| Minute | `REPLICATION_URL=.../minute/` & cron: `* * * * *` | Very High | ~1 minute | Real-time apps, emergency services |
+| 15 Minutes | `REPLICATION_URL=.../minute/` & cron: `*/15 * * * *` | High | ~15 minutes | Urban navigation, delivery services |
+| Hourly | `REPLICATION_URL=.../hour/` & cron: `0 * * * *` | Medium | ~1 hour | General use, balanced approach |
+| 6 Hours | `REPLICATION_URL=.../hour/` & cron: `0 */6 * * *` | Low | ~6 hours | Standard mapping applications |
+| Daily | `REPLICATION_URL=.../day/` & cron: `0 2 * * *` | Very Low | ~1 day | Static maps, rural areas |
+
+Example for hourly updates:
+```bash
+docker run -p 8080:80 \
+    -e UPDATES=enabled \
+    -e REPLICATION_URL=https://planet.openstreetmap.org/replication/hour/ \
+    -e MAX_INTERVAL_SECONDS=3600 \
+    -v osm-data:/data/database/ \
+    -v osm-tiles:/data/tiles/ \
+    -d terradock \
+    run
+```
+
+### Expiry Settings Examples
+
+Tile expiry settings control which zoom levels get re-rendered or deleted after updates:
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `EXPIRY_MINZOOM` | Minimum zoom to consider for expiry | 13 |
+| `EXPIRY_TOUCHFROM` | Minimum zoom to mark as dirty | 13 |
+| `EXPIRY_DELETEFROM` | Minimum zoom to delete instead of re-rendering | 19 |
+| `EXPIRY_MAXZOOM` | Maximum zoom to consider for expiry | 20 |
+
+Example configurations:
+
+1. **Low-resource server** (minimize rendering load):
+   ```bash
+   -e EXPIRY_MINZOOM=13 \
+   -e EXPIRY_TOUCHFROM=13 \
+   -e EXPIRY_DELETEFROM=16 \
+   -e EXPIRY_MAXZOOM=18
+   ```
+   This deletes higher zoom tiles (16+) instead of re-rendering them, reducing CPU load.
+
+2. **High-performance server** (maximize quality):
+   ```bash
+   -e EXPIRY_MINZOOM=10 \
+   -e EXPIRY_TOUCHFROM=10 \
+   -e EXPIRY_DELETEFROM=20 \
+   -e EXPIRY_MAXZOOM=20
+   ```
+   This re-renders all affected tiles from zoom 10 to 19, ensuring maximum freshness.
+
+3. **Balanced approach**:
+   ```bash
+   -e EXPIRY_MINZOOM=12 \
+   -e EXPIRY_TOUCHFROM=12 \
+   -e EXPIRY_DELETEFROM=18 \
+   -e EXPIRY_MAXZOOM=20
+   ```
+
+To implement these settings:
+
+```bash
+docker run -p 8080:80 \
+    -e UPDATES=enabled \
+    -e EXPIRY_MINZOOM=13 \
+    -e EXPIRY_TOUCHFROM=13 \
+    -e EXPIRY_DELETEFROM=18 \
+    -e EXPIRY_MAXZOOM=20 \
+    -v osm-data:/data/database/ \
+    -v osm-tiles:/data/tiles/ \
+    -d terradock \
+    run
+```
+
+### Configuration Profiles for Different Scenarios
+
+Here are recommended configurations for common use cases:
+
+1. **Small City/Local Deployment** (minimal hardware, <4GB RAM):
+   ```bash
+   # Import
+   docker run \
+       -e THREADS=2 \
+       -e DOWNLOAD_PBF="https://download.geofabrik.de/europe/luxembourg-latest.osm.pbf" \
+       -e DOWNLOAD_POLY="https://download.geofabrik.de/europe/luxembourg.poly" \
+       -e UPDATES=enabled \
+       -e OSM2PGSQL_EXTRA_ARGS="-C 500" \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       terradock import
+
+   # Run
+   docker run -p 8080:80 \
+       -e THREADS=2 \
+       -e UPDATES=enabled \
+       -e EXPIRY_DELETEFROM=16 \
+       -e EXPIRY_MAXZOOM=18 \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       -d terradock run
+   ```
+   
+   **Recommended cron**: Daily updates (`0 2 * * *`)
+
+2. **Country-Level Deployment** (8GB RAM):
+   ```bash
+   # Import
+   docker run \
+       -e THREADS=4 \
+       -e FLAT_NODES=enabled \
+       -e DOWNLOAD_PBF="https://download.geofabrik.de/europe/germany-latest.osm.pbf" \
+       -e DOWNLOAD_POLY="https://download.geofabrik.de/europe/germany.poly" \
+       -e UPDATES=enabled \
+       -e OSM2PGSQL_EXTRA_ARGS="-C 2048" \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       terradock import
+
+   # Run
+   docker run -p 8080:80 \
+       -e THREADS=4 \
+       -e FLAT_NODES=enabled \
+       -e UPDATES=enabled \
+       -e EXPIRY_MINZOOM=12 \
+       -e EXPIRY_TOUCHFROM=12 \
+       -e EXPIRY_DELETEFROM=18 \
+       -e EXPIRY_MAXZOOM=19 \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       -d terradock run
+   ```
+   
+   **Recommended cron**: Hourly updates (`0 * * * *`)
+
+3. **Continental/Production Deployment** (16GB+ RAM):
+   ```bash
+   # Import
+   docker run \
+       -e THREADS=8 \
+       -e FLAT_NODES=enabled \
+       -e DOWNLOAD_PBF="https://download.geofabrik.de/europe-latest.osm.pbf" \
+       -e DOWNLOAD_POLY="https://download.geofabrik.de/europe.poly" \
+       -e UPDATES=enabled \
+       -e OSM2PGSQL_EXTRA_ARGS="-C 8192 --number-processes 8" \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       terradock import
+
+   # Run
+   docker run -p 8080:80 \
+       -e THREADS=6 \
+       -e FLAT_NODES=enabled \
+       -e UPDATES=enabled \
+       -e EXPIRY_MINZOOM=10 \
+       -e EXPIRY_TOUCHFROM=10 \
+       -e EXPIRY_DELETEFROM=19 \
+       -e EXPIRY_MAXZOOM=20 \
+       -v osm-data:/data/database/ \
+       -v osm-tiles:/data/tiles/ \
+       --shm-size=512m \
+       -d terradock run
+   ```
+   
+   **Recommended cron**: 15-minute updates (`*/15 * * * *`)
 
 ## Special Use Cases
 
@@ -469,6 +957,11 @@ This repository improves upon the original OSM tile server in several ways:
 3. **Enhanced Containerization**: Multi-stage builds and proper volume management
 4. **Improved Documentation**: Comprehensive setup and tuning guides
 5. **Simplified Deployment**: Streamlined import and run processes
+6. **Consolidated Flat Nodes Handling**: Simplified approach to handling flat nodes
+
+## Known Issues and Fixes
+
+1. **PostgreSQL Configuration**: The PostgreSQL configuration has hardcoded memory settings that might not be optimal for all deployment environments. Consider modifying the `postgresql.custom.conf.tmpl` file for your specific hardware.
 
 ## Components
 

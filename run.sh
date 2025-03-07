@@ -11,6 +11,27 @@ function setPostgresPassword() {
     sudo -u postgres psql -c "ALTER USER renderd PASSWORD '${PGPASSWORD:-renderd}'"
 }
 
+function handle_flat_nodes() {
+  # Check if flat nodes is enabled
+  if [ "${FLAT_NODES:-}" == "enabled" ] || [ "${FLAT_NODES:-}" == "1" ]; then
+    # Ensure the flat nodes directory exists
+    mkdir -p /data/database/
+    
+    # Migrate from old location if needed
+    if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
+      mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
+    fi
+    
+    # Set proper ownership
+    if [ -f /data/database/flat_nodes.bin ]; then
+      chown renderd: /data/database/flat_nodes.bin
+    fi
+    
+    # Add to osm2pgsql arguments
+    export OSM2PGSQL_EXTRA_ARGS="${OSM2PGSQL_EXTRA_ARGS:-} --flat-nodes /data/database/flat_nodes.bin"
+  fi
+}
+
 if [ "$#" -ne 1 ]; then
     echo "usage: <import|run>"
     echo "commands:"
@@ -89,10 +110,8 @@ if [ "$1" == "import" ]; then
         chown renderd: /data/database/region.poly
     fi
 
-    # flat-nodes
-    if [ "${FLAT_NODES:-}" == "enabled" ] || [ "${FLAT_NODES:-}" == "1" ]; then
-        OSM2PGSQL_EXTRA_ARGS="${OSM2PGSQL_EXTRA_ARGS:-} --flat-nodes /data/database/flat_nodes.bin"
-    fi
+    # Handle flat-nodes
+    handle_flat_nodes
 
     # Import data
     sudo -u renderd osm2pgsql -d gis --create --slim -G --hstore  \
@@ -102,12 +121,6 @@ if [ "$1" == "import" ]; then
       /data/region.osm.pbf  \
       ${OSM2PGSQL_EXTRA_ARGS:-}  \
     ;
-
-    # old flat-nodes dir
-    if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
-        mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
-        chown renderd: /data/database/flat_nodes.bin
-    fi
 
     # Create indexes
     if [ -f /data/style/${NAME_SQL:-indexes.sql} ]; then
@@ -142,9 +155,10 @@ if [ "$1" == "run" ]; then
         mkdir /data/database/postgres/
         mv /data/database/* /data/database/postgres/
     fi
-    if [ -f /nodes/flat_nodes.bin ] && ! [ -f /data/database/flat_nodes.bin ]; then
-        mv /nodes/flat_nodes.bin /data/database/flat_nodes.bin
-    fi
+    
+    # Handle flat nodes
+    handle_flat_nodes
+    
     if [ -f /data/tiles/data.poly ] && ! [ -f /data/database/region.poly ]; then
         mv /data/tiles/data.poly /data/database/region.poly
     fi
