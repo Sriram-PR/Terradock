@@ -135,7 +135,7 @@ fi
 # -----------------------------------------------------------------------------
 # Add disk space check from https://github.com/zverik/regional
 # -----------------------------------------------------------------------------
-MIN_DISK_SPACE_MB=500
+MIN_DISK_SPACE_MB=512
 
 if `python -c "import os, sys; st=os.statvfs('$BASE_DIR'); sys.exit(1 if st.f_bavail*st.f_frsize/1024/1024 > $MIN_DISK_SPACE_MB else 0)"`; then
     m_info "there is less than $MIN_DISK_SPACE_MB MB left"
