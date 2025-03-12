@@ -1,0 +1,13 @@
+.git
+.github
+*.md
+!README.md
+.gitignore
+.dockerignore
+*.log
+*.tmp
+*.backup
+*.pbf
+*.osm
+test/
+docs/
